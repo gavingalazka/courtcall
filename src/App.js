@@ -487,13 +487,14 @@ export default function App() {
   function blockPlayers(courtId,day,block){return schedule.filter(s=>s.courtId===courtId&&s.day===day&&s.block===block);}
 
   function filteredPlayers(){
-    let r=[...players];
+    let r=[...players].filter(p=>p&&p.name); // null safety
+    if(liveFilters.name) r=r.filter(p=>p.name.toLowerCase().includes(liveFilters.name.toLowerCase()));
     if(pSkill==="playing")r=r.filter(p=>cins.some(c=>c.pid===p.id));
     else if(SKILLS.includes(pSkill))r=r.filter(p=>parseFloat(p.dupr||p.skill||0)>=parseFloat(pSkill));
     if(pCourt!=="all")r=r.filter(p=>cins.some(c=>c.pid===p.id&&c.cid===parseInt(pCourt)));
     if(pSort==="dupr")r.sort((a,b)=>parseFloat(b.dupr||0)-parseFloat(a.dupr||0));
     else if(pSort==="skill")r.sort((a,b)=>SKILLS.indexOf(b.skill)-SKILLS.indexOf(a.skill));
-    else r.sort((a,b)=>a.name.localeCompare(b.name));
+    else r.sort((a,b)=>(a.name||"").localeCompare(b.name||""));
     return r;
   }
 
@@ -1141,7 +1142,7 @@ export default function App() {
 
             {/* Search + filters */}
             <div style={{display:"flex",gap:8,marginBottom:12}}>
-              <input className="inp" style={{flex:2,padding:"9px 12px",fontSize:13}} placeholder="Search players..." value={pSort==="name"?liveFilters.name:""} onChange={e=>setLiveFilters(d=>({...d,name:e.target.value}))}/>
+              <input className="inp" style={{flex:2,padding:"9px 12px",fontSize:13}} placeholder="Search players..." value={liveFilters.name||""} onChange={e=>setLiveFilters(d=>({...d,name:e.target.value}))}/>
               <select className="inp" style={{flex:1,padding:"9px 10px",fontSize:13}} value={pSkill} onChange={e=>setPSkill(e.target.value)}>
                 <option value="all">All Levels</option>
                 {SKILLS.map(s=><option key={s}>{s}</option>)}
@@ -1202,7 +1203,8 @@ export default function App() {
             )}
 
             {/* Player list */}
-            {filteredPlayers().map(p=>{
+            {filteredPlayers().filter(p=>p&&p.name&&p.id).map(p=>{
+              if(!p||!p.name)return null;
               const cin=cins.find(c=>c.pid===p.id);
               const court=cin?COURTS.find(c=>c.id===cin.cid):null;
               const isMe=cu?.id===p.id;
