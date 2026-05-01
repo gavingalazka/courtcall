@@ -159,8 +159,9 @@ function Badge({skill,dupr}){
   const dark=["2.5","3.0","3.5"].includes(rating);
   return <span style={{background:bg,color:dark?"#111":"#fff",borderRadius:5,padding:"2px 7px",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>{rating} DUPR</span>;
 }
-function Avatar({name,color,size=38}){
-  return <div style={{width:size,height:size,borderRadius:"50%",background:color||"#444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:size*0.42,fontWeight:700,color:"#111"}}>{name?.[0]?.toUpperCase()||"?"}</div>;
+function Avatar({name,color,size=38,avatar=null}){
+  if(avatar) return <img src={avatar} alt={name||""} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0,border:"2px solid rgba(200,240,0,0.15)"}}/>;
+  return <div style={{width:size,height:size,borderRadius:"50%",background:color||"#444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:size*0.42,fontWeight:700,color:"#111"}}>{(name||"?")[0].toUpperCase()}</div>;
 }
 
 export default function App() {
@@ -178,7 +179,7 @@ export default function App() {
   const [now, setNow]           = useState(Date.now());
   const [toast, setToast]       = useState(null);
   const [step, setStep]         = useState(1);
-  const [form, setForm]         = useState({name:"",dupr:"",skill:"3.5",phone:"",email:"",gender:"",age:"",avatar:null,notifyEmail:true,notifyText:false,notifySkills:["2.5","3.0","3.5","4.0","4.5","5.0"]});
+  const [form, setForm]         = useState({name:"",dupr:"",skill:"3.5",phone:"",email:"",gender:"",age:"",avatar:null,notifyEmail:true,notifyText:false,notifySkills:["2.5","3.0","3.5","4.0","4.5","5.0"],rememberMe:true,pin:""});
   const [pSort, setPSort]       = useState("name");
   const [pSkill, setPSkill]     = useState("all");
   const [pCourt, setPCourt]     = useState("all");
@@ -217,6 +218,9 @@ export default function App() {
   const [privateInvites, setPrivateInvites] = useState([]);
   const [showInvitePicker, setShowInvitePicker] = useState(false);
   const [editProfile, setEditProfile] = useState(false);
+  const [showPinPrompt, setShowPinPrompt] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
   const [editForm, setEditForm] = useState({});
   const [notifyPrompt, setNotifyPrompt] = useState(null); // {court, day, block, entry}
   const [avPrev, setAvPrev]           = useState(null);
@@ -273,6 +277,47 @@ export default function App() {
         pos=>reverseGeocode(pos.coords.latitude,pos.coords.longitude),
         ()=>{},{timeout:5000,maximumAge:300000}
       );
+    }
+  },[]);
+
+  // Restore logged-in user on app load
+  useEffect(()=>{
+    const saved=ss("cc_cu",null);
+    const remember=ss("cc_remember","true");
+    const exp=ss("cc_login_exp",null);
+
+    // Check if session expired (only applies when rememberMe was false)
+    if(remember==="false"&&exp&&Date.now()>exp){
+      // Session expired — show pin prompt
+      sw("cc_cu",null);
+      return;
+    }
+
+    if(saved?.id){
+      // Try to restore from Supabase
+      sb.from("players").select("*").eq("id",saved.id).single()
+        .then(({data,error})=>{
+          if(data&&!error){
+            const p={
+              id:data.id,name:data.name,email:data.email||"",
+              phone:data.phone||"",dupr:data.dupr||"3.5",
+              skill:data.skill||"3.5",gender:data.gender||"",
+              age:data.age||"",avatar:data.avatar||null,
+              color:data.color||"#C8F000",pin:data.pin||saved.pin||"",
+              rememberMe:saved.rememberMe!==false,
+              notifyEmail:data.notify_email,
+              notifyText:data.notify_text,
+              notifySkills:data.notify_skills||[],
+            };
+            setCu(p);sw("cc_cu",p);
+          } else if(saved?.name) {
+            // Supabase failed but we have local data — use it
+            setCu(saved);
+          }
+        }).catch(()=>{
+          // No internet — fall back to local
+          if(saved?.name) setCu(saved);
+        });
     }
   },[]);
 
@@ -427,10 +472,22 @@ ${contactForm.message}`,
 
   function signup(){
     const color=AV_BG[players.length%AV_BG.length];
-    const p={id:`p_${Date.now()}`,name:form.name.trim(),dupr:form.dupr,skill:form.skill,phone:form.phone,email:form.email,gender:form.gender,age:form.age,avatar:form.avatar||null,notifyEmail:form.notifyEmail,notifyText:form.notifyText,notifySkills:form.notifySkills,color};
+    const p={id:`p_${Date.now()}`,name:form.name.trim(),dupr:form.dupr,skill:form.skill,phone:form.phone,email:form.email,gender:form.gender,age:form.age,avatar:form.avatar||null,notifyEmail:form.notifyEmail,notifyText:form.notifyText,notifySkills:form.notifySkills,color,pin:form.pin,rememberMe:form.rememberMe};
     setAvPrev(null);
-    setPlayers(prev=>[...prev,p]);setCu(p);
-    setForm({name:"",dupr:"",skill:"3.5",avatar:null,phone:""});setStep(1);setView("courts");
+    setPlayers(prev=>[...prev,p]);
+    setCu(p);
+    sw("cc_cu",p);
+    if(form.rememberMe){
+      sw("cc_remember","true");
+      sw("cc_uid",p.id);
+    } else {
+      // Set 7-day expiry
+      sw("cc_remember","false");
+      sw("cc_uid",p.id);
+      sw("cc_login_exp", Date.now()+(7*24*60*60*1000));
+    }
+    setForm({name:"",dupr:"",skill:"3.5",avatar:null,phone:"",pin:"",rememberMe:true});
+    setStep(1);setView("courts");
     toast_(`Welcome, ${p.name}! 🏓`);
   }
 
@@ -613,7 +670,7 @@ ${contactForm.message}`,
           <div style={{fontSize:9,letterSpacing:4,color:DIM}}>PICKLEBALL NETWORK</div>
           {cu&&(
             <div style={{marginTop:8,display:"inline-flex",alignItems:"center",gap:6,background:CARD,border:`1px solid ${BRD}`,borderRadius:50,padding:"4px 12px"}}>
-              <Avatar name={cu.name} color={cu.color} size={20} avatar={cu.avatar||null}/>
+              <Avatar name={cu.name} color={cu.color} size={24} avatar={cu.avatar||null}/>
               <span style={{fontSize:12,color:G,fontWeight:600}}>{cu.name}</span>
               {myCin()&&<span style={{fontSize:11,color:DIM}}>· playing now</span>}
             </div>
@@ -657,7 +714,7 @@ ${contactForm.message}`,
                       </div>
                       {ci.length>0&&(
                         <div style={{marginTop:6,display:"flex",gap:3}}>
-                          {ci.slice(0,5).map(c=>{const p=pById(c.pid);return p?<Avatar key={c.id} name={p.name} color={p.color} size={22}/>:null;})}
+                          {ci.slice(0,5).map(c=>{const p=pById(c.pid);return p?<Avatar key={c.id} name={p.name} color={p.color} size={22} avatar={p.avatar||null}/>:null;})}
                           {ci.length>5&&<span style={{color:DIM,fontSize:11}}>+{ci.length-5}</span>}
                         </div>
                       )}
@@ -903,7 +960,7 @@ ${contactForm.message}`,
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
             <div style={{background:CARD,border:`1px solid ${BRD}`,borderRadius:"20px 20px 0 0",padding:"28px 20px 40px",width:"100%",maxWidth:460}}>
               <div style={{textAlign:"center",marginBottom:20}}>
-                <div style={{display:"flex",justifyContent:"center",marginBottom:10}}><Avatar name={showRateModal.name} color={showRateModal.color} size={56}/></div>
+                <div style={{display:"flex",justifyContent:"center",marginBottom:10}}><Avatar name={showRateModal.name} color={showRateModal.color} size={56} avatar={showRateModal.avatar||null}/></div>
                 <div style={{fontWeight:800,fontSize:20,marginBottom:4}}>Rate {showRateModal.name}</div>
                 <div style={{color:DIM,fontSize:13}}>How was your game with this player?</div>
               </div>
@@ -1121,7 +1178,7 @@ ${contactForm.message}`,
                                     {myMatch&&cu&&<span style={{background:"rgba(200,240,0,.12)",color:G,fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:50}}>✓ Your Level</span>}
                                   </div>
                                   <div style={{display:"flex",gap:3,alignItems:"center"}}>
-                                    {bp.slice(0,4).map(s=><Avatar key={s.id} name={s.name} color={s.color} size={20}/>)}
+                                    {bp.slice(0,4).map(s=><Avatar key={s.id} name={s.name} color={s.color} size={20} avatar={s.avatar||null}/>)}
                                     <span style={{color:DIM,fontSize:11,marginLeft:4}}>{bp.length} player{bp.length!==1?"s":""}</span>
                                   </div>
                                 </div>
@@ -1280,7 +1337,7 @@ ${contactForm.message}`,
           <div>
             <button className="gbtn" style={{marginBottom:14}} onClick={()=>setView("community")}>← Community</button>
             <div className="card" style={{textAlign:"center",marginBottom:10}}>
-              <div style={{display:"flex",justifyContent:"center",marginBottom:10}}><Avatar name={vpp.name} color={vpp.color} size={88} avatar={vpp.avatar||null} avatar={vpp.avatar||null}/></div>
+              <div style={{display:"flex",justifyContent:"center",marginBottom:10}}><Avatar name={vpp.name} color={vpp.color} size={88} avatar={vpp.avatar||null}/></div>
               <div style={{fontSize:22,fontWeight:800}}>{vpp.name}</div>
               <div style={{marginTop:7}}><Badge skill={vpp.skill} dupr={vpp.dupr}/></div>
               {vpp.age&&<div style={{color:DIM,fontSize:13,marginTop:6}}>🎂 {vpp.age} years old</div>}
@@ -1615,13 +1672,28 @@ ${contactForm.message}`,
                 </div>
                 <button className="pbtn" style={{width:"100%"}} disabled={!form.name.trim()||!form.email.trim()||!form.age} onClick={()=>setStep(2)}>NEXT →</button>
                 <div style={{textAlign:"center",marginTop:12,fontSize:12,color:DIM}}>
-                  Already signed up on another device?{" "}
-                  <span style={{color:G,cursor:"pointer",fontWeight:600}} onClick={()=>{
-                    const email=prompt("Enter your email to restore your profile:");
+                  Signed up before?{" "}
+                  <span style={{color:G,cursor:"pointer",fontWeight:600}} onClick={async()=>{
+                    const email=prompt("Enter your email address:");
                     if(!email)return;
-                    const found=players.find(p=>p.email?.toLowerCase()===email.toLowerCase());
-                    if(found){setCu(found);sw("cc_cu",found);setView("profile");toast_("Welcome back, "+found.name+"! 👋");}
-                    else toast_("No profile found for that email.");
+                    try{
+                      const{data}=await sb.from("players").select("*").ilike("email",email.trim()).single();
+                      if(data){
+                        // Verify PIN
+                        const pin=prompt(`Welcome back ${data.name}! Enter your 6-digit PIN:`);
+                        if(!pin)return;
+                        const savedPin=data.pin||ss("cc_cu",null)?.pin;
+                        if(pin===savedPin||pin===data.pin){
+                          const p={id:data.id,name:data.name,email:data.email,phone:data.phone||"",dupr:data.dupr||"3.5",skill:data.skill||"3.5",gender:data.gender||"",age:data.age||"",avatar:data.avatar||null,color:data.color||"#C8F000",pin:data.pin||pin,rememberMe:true,notifyEmail:data.notify_email,notifyText:data.notify_text,notifySkills:data.notify_skills||[]};
+                          setCu(p);sw("cc_cu",p);sw("cc_remember","true");
+                          setView("profile");toast_("Welcome back, "+p.name+"! 👋");
+                        } else {
+                          toast_("Incorrect PIN — try again");
+                        }
+                      } else {
+                        toast_("No profile found — check your email or sign up");
+                      }
+                    }catch{toast_("No profile found — check your email or sign up");}
                   }}>Sign in here</span>
                 </div>
               </div>
@@ -1781,10 +1853,31 @@ ${contactForm.message}`,
                     <span style={{fontSize:13}}>{form.notifySkills.join(", ")||"None"}</span>
                   </div>
                 </div>
+                {/* PIN setup */}
+                <div className="card" style={{marginBottom:14,textAlign:"left"}}>
+                  <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>🔐 Account Security</div>
+                  <div className="lbl">Create a 6-digit PIN</div>
+                  <input className="inp" type="password" inputMode="numeric" maxLength={6} placeholder="e.g. 123456" value={form.pin} onChange={e=>setForm(d=>({...d,pin:e.target.value.replace(/\D/g,"").slice(0,6)}))} style={{marginBottom:10,letterSpacing:6,fontSize:18,textAlign:"center"}}/>
+                  <div style={{fontSize:11,color:DIM,marginBottom:12}}>Used when signing in on a new device. Easy to remember — like a simple number.</div>
+
+                  {/* Remember Me */}
+                  <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",background:form.rememberMe?"rgba(200,240,0,.06)":"#080C14",border:`1px solid ${form.rememberMe?"rgba(200,240,0,.2)":"#1E3050"}`,borderRadius:10,cursor:"pointer"}}
+                    onClick={()=>setForm(d=>({...d,rememberMe:!d.rememberMe}))}>
+                    <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${form.rememberMe?G:"#1E3050"}`,background:form.rememberMe?G:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#111",fontWeight:800,flexShrink:0}}>
+                      {form.rememberMe&&"✓"}
+                    </div>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:13}}>Remember me on this device</div>
+                      <div style={{fontSize:11,color:DIM}}>Stay logged in forever — only sign in again if you sign out</div>
+                    </div>
+                  </div>
+                </div>
+
                 <div style={{display:"flex",gap:8}}>
                   <button className="gbtn" onClick={()=>setStep(4)}>← Back</button>
-                  <button className="pbtn" style={{flex:1,fontSize:17}} onClick={signup}>JOIN 🏓</button>
+                  <button className="pbtn" style={{flex:1,fontSize:17}} disabled={form.pin.length<6} onClick={signup}>JOIN 🏓</button>
                 </div>
+                {form.pin.length<6&&<div style={{fontSize:11,color:DIM,textAlign:"center",marginTop:8}}>Enter a 6-digit PIN to continue</div>}
               </div>
             )}
           </div>
@@ -1859,11 +1952,24 @@ ${contactForm.message}`,
                   <div className="lbl">Email</div>
                   <input className="inp" type="email" placeholder="your@email.com" value={editForm.email||""} onChange={e=>setEditForm(d=>({...d,email:e.target.value}))} style={{marginBottom:16}}/>
 
-                  <button className="pbtn" style={{width:"100%",fontSize:16,marginBottom:10}} onClick={()=>{
+                  <button className="pbtn" style={{width:"100%",fontSize:16,marginBottom:10}} onClick={async()=>{
                     const updated={...cu,...editForm};
                     setCu(updated);
                     sw("cc_cu",updated);
                     setPl(p=>p.map(x=>x.id===cu.id?updated:x));
+                    // Update in Supabase
+                    try{
+                      await sb.from("players").update({
+                        name:updated.name,
+                        dupr:updated.dupr,
+                        skill:updated.skill,
+                        age:updated.age,
+                        gender:updated.gender,
+                        phone:updated.phone,
+                        email:updated.email,
+                        avatar:updated.avatar,
+                      }).eq("id",cu.id);
+                    }catch(e){console.log("profile update error",e);}
                     setEditProfile(false);
                     toast_("Profile updated! ✓");
                   }}>Save Changes</button>
