@@ -78,27 +78,10 @@ function getWeekDays() {
   return days;
 }
 
-const DEMO_PLAYERS = [
-  { id:"d1", name:"Sarah K.", dupr:"4.25", skill:"4.0", phone:"239-555-0101", color:"#38BDF8" },
-  { id:"d2", name:"Mike R.",  dupr:"3.50", skill:"3.5", phone:"239-555-0202", color:"#C8F000" },
-  { id:"d3", name:"Tom B.",   dupr:"2.75", skill:"3.0", phone:"239-555-0303", color:"#FF5C1A" },
-];
-const DEMO_LISTINGS = [
-  { id:"l1", seller:"Sarah K.", title:"Selkirk Vanguard Power Air", price:220, phone:"239-555-0101", category:"Paddle", img:"https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=400&q=80" },
-  { id:"l2", seller:"Mike R.",  title:"Franklin X-40 Pickleballs (12pk)", price:28, phone:"239-555-0202", category:"Balls", img:"https://images.unsplash.com/photo-1587280501635-68a0e82cd5ff?w=400&q=80" },
-  { id:"l3", seller:"Tom B.",   title:"ASICS Court Shoes Size 10", price:55, phone:"239-555-0303", category:"Shoes", img:"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80" },
-];
-const DEMO_SUGG = [
-  { id:"s1", text:"Game request feature to challenge other players", votes:12 },
-  { id:"s2", text:"Show court busyness by hour of day", votes:8 },
-  { id:"s3", text:"Skill-based matchmaking", votes:6 },
-];
-// Demo schedule entries: { id, pid, name, color, skill, dupr, courtId, day, block }
-const DEMO_SCHEDULE = [
-  { id:"sc1", pid:"d1", name:"Sarah K.", color:"#38BDF8", skill:"4.0", dupr:"4.25", courtId:1, day: getWeekDays()[1].key, block:"8–10am" },
-  { id:"sc2", pid:"d2", name:"Mike R.",  color:"#C8F000", skill:"3.5", dupr:"3.50", courtId:1, day: getWeekDays()[1].key, block:"8–10am" },
-  { id:"sc3", pid:"d3", name:"Tom B.",   color:"#FF5C1A", skill:"3.0", dupr:"2.75", courtId:2, day: getWeekDays()[2].key, block:"10am–12pm" },
-];
+const DEMO_PLAYERS = [];
+const DEMO_LISTINGS = [];
+const DEMO_SUGG = [];
+const DEMO_SCHEDULE = [];
 
 function ss(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
 function sw(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
@@ -167,14 +150,14 @@ function Avatar({name,color,size=38,avatar=null}){
 
 export default function App() {
   const [view, setView]         = useState("courts");
-  const [players, setPlayers]   = useState(()=>ss("cc_pl",DEMO_PLAYERS));
+  const [players, setPlayers]   = useState([]);
   const [cu, setCu]             = useState(()=>ss("cc_cu",null));
-  const [cins, setCins]         = useState(()=>ss("cc_ci",[]).filter(c=>c.exp>Date.now()));
+  const [cins, setCins]         = useState([]);
   const [fol, setFol]           = useState(()=>ss("cc_fol",[]));
-  const [listings, setList]     = useState(()=>ss("cc_lst",DEMO_LISTINGS));
+  const [listings, setList]     = useState([]);
   const [sugg, setSugg]         = useState(()=>ss("cc_sg",DEMO_SUGG));
   const [voted, setVoted]       = useState(()=>ss("cc_vt",[]));
-  const [schedule, setSched]    = useState(()=>ss("cc_sched",DEMO_SCHEDULE));
+  const [schedule, setSched]    = useState([]);
   const [selCourt, setSelCourt] = useState(null);
   const [checkedIn, setCheckedIn]=useState(false);
   const [now, setNow]           = useState(Date.now());
@@ -196,10 +179,7 @@ export default function App() {
   const [cardCvv, setCardCvv]   = useState("");
   const [newSugg, setNewSugg]   = useState("");
   const [vpp, setVpp]           = useState(null);
-  const [openCalls, setOpenCalls] = useState([
-    {id:"oc1",pid:"d1",name:"Sarah K.",color:"#38BDF8",skill:"4.0",dupr:"4.25",courtId:1,day:"Today",time:"8–10am",msg:"Looking for 3.5+ players for doubles!",ts:Date.now()-3600000},
-    {id:"oc2",pid:"d2",name:"Mike R.",color:"#C8F000",skill:"3.5",dupr:"3.50",courtId:2,day:"Tomorrow",time:"10am–12pm",msg:"Anyone want to hit? 3.5 DUPR friendly",ts:Date.now()-1800000},
-  ]);
+  const [openCalls, setOpenCalls] = useState([]);
   const [ratings, setRatings]   = useState([]);
   const [showRateModal, setShowRateModal] = useState(null);
   const [liveFilters, setLiveFilters] = useState({court:"all",skill:"all",gender:"all",name:"",age:"all"});
@@ -321,6 +301,124 @@ export default function App() {
         });
     }
   },[]);
+
+  // ── Load ALL data from Supabase on mount ──
+  useEffect(()=>{
+    loadAllData();
+
+    // Real-time subscriptions for live updates
+    if(!sb)return;
+    const cinSub = sb?.channel("checkins-rt")
+      .on("postgres_changes",{event:"*",schema:"public",table:"checkins"},()=>loadCheckins())
+      .subscribe();
+    const plSub = sb?.channel("players-rt")
+      .on("postgres_changes",{event:"*",schema:"public",table:"players"},()=>loadPlayers())
+      .subscribe();
+    const schedSub = sb?.channel("schedule-rt")
+      .on("postgres_changes",{event:"*",schema:"public",table:"schedule"},()=>loadSchedule())
+      .subscribe();
+    const msgSub = sb?.channel("messages-rt")
+      .on("postgres_changes",{event:"*",schema:"public",table:"messages"},()=>loadMessages())
+      .subscribe();
+    const listSub = sb?.channel("listings-rt")
+      .on("postgres_changes",{event:"*",schema:"public",table:"listings"},()=>loadListings())
+      .subscribe();
+    const callSub = sb?.channel("calls-rt")
+      .on("postgres_changes",{event:"*",schema:"public",table:"open_calls"},()=>loadOpenCalls())
+      .subscribe();
+
+    return()=>{
+      sb?.removeChannel(cinSub);
+      sb?.removeChannel(plSub);
+      sb?.removeChannel(schedSub);
+      sb?.removeChannel(msgSub);
+      sb?.removeChannel(listSub);
+      sb?.removeChannel(callSub);
+    };
+  },[]);
+
+  async function loadAllData(){
+    await Promise.all([
+      loadPlayers(),
+      loadCheckins(),
+      loadSchedule(),
+      loadListings(),
+      loadMessages(),
+      loadOpenCalls(),
+    ]);
+  }
+
+  async function loadPlayers(){
+    try{
+      const{data}=await sb?.from("players").select("*").order("created_at",{ascending:false});
+      if(data) setPl(data.map(p=>({
+        id:p.id,name:p.name||"",email:p.email||"",phone:p.phone||"",
+        dupr:p.dupr||"3.5",skill:p.skill||"3.5",gender:p.gender||"",
+        age:p.age||"",avatar:p.avatar||null,color:p.color||AV_BG[0],
+        pin:p.pin||"",rememberMe:p.remember_me!==false,
+        notifyEmail:p.notify_email,notifyText:p.notify_text,
+        notifySkills:p.notify_skills||[],
+      })));
+    }catch(e){console.log("loadPlayers err",e);}
+  }
+
+  async function loadCheckins(){
+    try{
+      const{data}=await sb?.from("checkins").select("*").gt("expires_at",new Date().toISOString());
+      if(data) setCins(data.map(c=>({
+        id:c.id,pid:c.player_id,cid:c.court_id,
+        at:new Date(c.checked_in_at).getTime(),
+        exp:new Date(c.expires_at).getTime(),
+      })));
+    }catch(e){console.log("loadCheckins err",e);}
+  }
+
+  async function loadSchedule(){
+    try{
+      const{data}=await sb?.from("schedule").select("*");
+      if(data) setSched(data.map(s=>({
+        id:s.id,pid:s.player_id,name:s.player_name||"",
+        color:s.player_color||AV_BG[0],skill:s.player_skill||"3.5",
+        dupr:s.player_dupr||"3.5",courtId:s.court_id,day:s.day,block:s.block,
+      })));
+    }catch(e){console.log("loadSchedule err",e);}
+  }
+
+  async function loadListings(){
+    try{
+      const{data}=await sb?.from("listings").select("*").eq("status","active").order("created_at",{ascending:false});
+      if(data) setList(data.map(l=>({
+        id:l.id,sellerId:l.seller_id,seller:l.seller_name||"",
+        title:l.title,price:l.price,desc:l.description||"",
+        phone:"",category:l.category,img:l.image_url,status:"active",
+      })));
+    }catch(e){console.log("loadListings err",e);}
+  }
+
+  async function loadMessages(){
+    try{
+      const{data}=await sb?.from("messages").select("*").order("created_at",{ascending:true});
+      if(data) setMessages(data.map(m=>({
+        id:m.id,from:m.from_id,to:m.to_id,
+        text:m.text,ts:new Date(m.created_at).getTime(),
+      })));
+    }catch(e){console.log("loadMessages err",e);}
+  }
+
+  async function loadOpenCalls(){
+    try{
+      const{data}=await sb?.from("open_calls").select("*").order("created_at",{ascending:false});
+      if(data) setOpenCalls(data.map(c=>({
+        id:c.id,pid:c.player_id,name:c.player_name||"",
+        color:c.player_color||AV_BG[0],skill:c.player_skill||"3.5",
+        dupr:c.player_dupr||"3.5",courtId:c.court_id,
+        courtName:c.court_name||"",address:c.address||"",
+        isPrivate:c.is_private,inviteOnly:c.invite_only,
+        day:c.day,time:c.time_block,msg:c.message,
+        ts:new Date(c.created_at).getTime(),
+      })));
+    }catch(e){console.log("loadOpenCalls err",e);}
+  }
 
   // Auto-start geofencing when user logs in
   useEffect(()=>{
@@ -448,15 +546,11 @@ ${contactForm.message}`,
   const [schedDay, setSchedDay]     = useState(null);
   const WEEK = getWeekDays();
 
-  useEffect(()=>{sw("cc_pl",players);},[players]);
   useEffect(()=>{sw("cc_cu",cu);},[cu]);
-  useEffect(()=>{sw("cc_ci",cins);},[cins]);
   useEffect(()=>{sw("cc_fol",fol);},[fol]);
-  useEffect(()=>{sw("cc_lst",listings);},[listings]);
   useEffect(()=>{sw("cc_sg",sugg);},[sugg]);
   useEffect(()=>{sw("cc_vt",voted);},[voted]);
   useEffect(()=>{sw("cc_pg",privateGames);},[privateGames]);
-  useEffect(()=>{sw("cc_sched",schedule);},[schedule]);
   useEffect(()=>{const t=setInterval(()=>{setNow(Date.now());setCins(p=>p.filter(c=>c.exp>Date.now()));},20000);return()=>clearInterval(t);},[]);
 
   const toast_=(m)=>{setToast(m);setTimeout(()=>setToast(null),2800);};
