@@ -1456,7 +1456,21 @@ export default function App() {
                 <div className="lbl">Title</div><input className="inp" placeholder="Item name" value={nl.title} onChange={e=>setNl(d=>({...d,title:e.target.value}))} style={{marginBottom:8}}/>
                 <div className="lbl">Price ($)</div><input className="inp" type="number" placeholder="0.00" value={nl.price} onChange={e=>setNl(d=>({...d,price:e.target.value}))} style={{marginBottom:8}}/>
                 {nl.price&&<div style={{fontSize:12,color:DIM,marginBottom:8}}>You keep the full ${parseFloat(nl.price||0).toFixed(2)} — CourtCall only charges the $1 listing fee.</div>}
-                <div className="lbl">Phone</div><input className="inp" placeholder={cu?.phone||"239-555-0000"} value={nl.phone} onChange={e=>setNl(d=>({...d,phone:e.target.value}))} style={{marginBottom:8}}/>
+                {cu?.phone?(
+                  <div style={{background:"#080C14",border:"1px solid #1E3050",borderRadius:10,padding:"11px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div>
+                      <div style={{fontSize:10,color:"#4A6890",letterSpacing:1.5,marginBottom:2}}>CONTACT PHONE</div>
+                      <div style={{fontSize:14,color:"#F4FFCC",fontWeight:600}}>📱 {cu.phone}</div>
+                    </div>
+                    <span style={{fontSize:10,background:"rgba(200,240,0,.12)",color:"#C8F000",borderRadius:50,padding:"3px 8px",fontWeight:700}}>From Profile ✓</span>
+                  </div>
+                ):(
+                  <div style={{marginBottom:8}}>
+                    <div className="lbl">Contact Phone</div>
+                    <input className="inp" placeholder="239-555-0000" value={nl.phone} onChange={e=>setNl(d=>({...d,phone:e.target.value}))}/>
+                    <div style={{fontSize:11,color:"#4A6890",marginTop:4}}>Add a phone to your profile to skip this step next time.</div>
+                  </div>
+                )}
                 <div className="lbl">Item Photo (optional)</div>
                 <label style={{display:"block",marginBottom:12}}>
                   <div style={{background:"#080C14",border:`1.5px dashed ${nl.img?"rgba(200,240,0,.5)":"#1E3050"}`,borderRadius:10,padding:"14px",textAlign:"center",cursor:"pointer",transition:"border-color .2s"}}>
