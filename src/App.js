@@ -486,6 +486,10 @@ export default function App() {
   function isMyBlock(courtId,day,block){return cu&&schedule.some(s=>s.pid===cu.id&&s.courtId===courtId&&s.day===day&&s.block===block);}
   function blockPlayers(courtId,day,block){return schedule.filter(s=>s.courtId===courtId&&s.day===day&&s.block===block);}
 
+  function toggleFol(pid){
+    setFol(p=>p.includes(pid)?p.filter(x=>x!==pid):[...p,pid]);
+  }
+
   function filteredPlayers(){
     let r=[...players].filter(p=>p&&p.name); // null safety
     if(liveFilters.name) r=r.filter(p=>p.name.toLowerCase().includes(liveFilters.name.toLowerCase()));
@@ -1203,6 +1207,11 @@ export default function App() {
             )}
 
             {/* Player list */}
+            {players.length===0&&(
+              <div style={{textAlign:"center",padding:"32px 0",color:DIM,fontSize:13}}>
+                No players yet — be the first to sign up!
+              </div>
+            )}
             {filteredPlayers().filter(p=>p&&p.name&&p.id).map(p=>{
               if(!p||!p.name)return null;
               const cin=cins.find(c=>c.pid===p.id);
@@ -1251,7 +1260,7 @@ export default function App() {
           <div>
             <button className="gbtn" style={{marginBottom:14}} onClick={()=>setView("community")}>← Community</button>
             <div className="card" style={{textAlign:"center",marginBottom:10}}>
-              <div style={{display:"flex",justifyContent:"center",marginBottom:10}}><Avatar name={vpp.name} color={vpp.color} size={88} avatar={vpp.avatar||null} avatar={vpp.avatar||null}/></div>
+              <div style={{display:"flex",justifyContent:"center",marginBottom:10}}><Avatar name={vpp.name} color={vpp.color} size={88} avatar={vpp.avatar||null}/></div>
               <div style={{fontSize:22,fontWeight:800}}>{vpp.name}</div>
               <div style={{marginTop:7}}><Badge skill={vpp.skill} dupr={vpp.dupr}/></div>
               {vpp.age&&<div style={{color:DIM,fontSize:13,marginTop:6}}>🎂 {vpp.age} years old</div>}
