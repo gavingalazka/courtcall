@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 // ── EmailJS config — replace with your real IDs from emailjs.com ──
 const EMAILJS_SERVICE  = "service_l1gc85q";
@@ -28,7 +29,7 @@ async function sendWelcomeEmail(name, email){
 
 const _SB_URL = "https://znpvckfdivdycvdndxbk.supabase.co";
 const _SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucHZja2ZkaXZkeWN2ZG5keGJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTY2MjcsImV4cCI6MjA5MzE5MjYyN30.xw96vdrpZVxwWdFqeDVkRsvvSTekF9P31KO8RthXQOw";
-const sb = window.supabase ? window.supabase.createClient(_SB_URL, _SB_KEY) : null;
+const sb = createClient(_SB_URL, _SB_KEY);
 
 const G = "#C8F000";
 const BG = "#080C14";
@@ -293,9 +294,9 @@ export default function App() {
       return;
     }
 
-    if(saved?.id){
+    if(saved?.id&&sb){
       // Try to restore from Supabase
-      sb.from("players").select("*").eq("id",saved.id).single()
+      sb?.from("players").select("*").eq("id",saved.id).single()
         .then(({data,error})=>{
           if(data&&!error){
             const p={
@@ -1677,7 +1678,7 @@ ${contactForm.message}`,
                     const email=prompt("Enter your email address:");
                     if(!email)return;
                     try{
-                      const{data}=await sb.from("players").select("*").ilike("email",email.trim()).single();
+                      const{data}=await sb?.from("players").select("*").ilike("email",email.trim()).single();
                       if(data){
                         // Verify PIN
                         const pin=prompt(`Welcome back ${data.name}! Enter your 6-digit PIN:`);
@@ -1959,7 +1960,7 @@ ${contactForm.message}`,
                     setPl(p=>p.map(x=>x.id===cu.id?updated:x));
                     // Update in Supabase
                     try{
-                      await sb.from("players").update({
+                      await sb?.from("players").update({
                         name:updated.name,
                         dupr:updated.dupr,
                         skill:updated.skill,
