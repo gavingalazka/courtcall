@@ -1,5 +1,31 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
+// ── EmailJS config — replace with your real IDs from emailjs.com ──
+const EMAILJS_SERVICE  = "service_l1gc85q";
+const EMAILJS_TEMPLATE_WELCOME = "template_ykv416s";
+const EMAILJS_TEMPLATE_CONTACT = "template_ykv416s";
+const EMAILJS_KEY      = "V-iHB7EtfGBZJEZ9l";
+
+async function sendWelcomeEmail(name, email){
+  if(EMAILJS_SERVICE==="YOUR_SERVICE_ID")return; // not configured yet
+  try{
+    await fetch("https://api.emailjs.com/api/v1.0/email/send",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        service_id:EMAILJS_SERVICE,
+        template_id:EMAILJS_TEMPLATE_WELCOME,
+        user_id:EMAILJS_KEY,
+        template_params:{
+          to_name:name,
+          to_email:email,
+          message:`Welcome to CourtCall ${name}! You're now part of the Naples pickleball network. Open the app to check in at your local court and find players at your level.`,
+        }
+      })
+    });
+  }catch(e){console.log("Welcome email error",e);}
+}
+
 const _SB_URL = "https://znpvckfdivdycvdndxbk.supabase.co";
 const _SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucHZja2ZkaXZkeWN2ZG5keGJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTY2MjcsImV4cCI6MjA5MzE5MjYyN30.xw96vdrpZVxwWdFqeDVkRsvvSTekF9P31KO8RthXQOw";
 const sb = window.supabase ? window.supabase.createClient(_SB_URL, _SB_KEY) : null;
@@ -73,8 +99,8 @@ const DEMO_SCHEDULE = [
   { id:"sc3", pid:"d3", name:"Tom B.",   color:"#FF5C1A", skill:"3.0", dupr:"2.75", courtId:2, day: getWeekDays()[2].key, block:"10am–12pm" },
 ];
 
-function ss(k,d){try{const v=sessionStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
-function sw(k,v){try{sessionStorage.setItem(k,JSON.stringify(v));}catch{}}
+function ss(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
+function sw(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
 
 // ── Network Pickleball Icon ────────────────────────────────────────────────
 // A circular icon: pickleball holes replaced with dots connected by lines
@@ -349,13 +375,18 @@ export default function App() {
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           service_id:  EMAILJS_SERVICE,
-          template_id: EMAILJS_TEMPLATE,
+          template_id: EMAILJS_TEMPLATE_CONTACT,
           user_id:     EMAILJS_KEY,
           template_params:{
+            to_name:    "Gavin",
+            to_email:   "gavingalazka1@gmail.com",
             from_name:  contactForm.name,
             from_email: contactForm.email,
             subject:    contactForm.subject||"General",
-            message:    contactForm.message,
+            message:    `From: ${contactForm.name} (${contactForm.email})
+Subject: ${contactForm.subject||"General"}
+
+${contactForm.message}`,
           }
         })
       });
@@ -515,7 +546,7 @@ export default function App() {
     {id:"play",    label:"Play",    badge:mySchedCount+privateGames.length},
     {id:"community",label:"Community"},
     {id:"market",  label:"Shop"},
-    {id:cu?"profile":"signup", label:cu?"Profile":"Sign Up"},
+    {id:cu?"profile":"signup", label:"Profile"},
     {id:"contact", label:"Contact Us"},
   ];
 
@@ -1583,6 +1614,16 @@ export default function App() {
                   </div>
                 </div>
                 <button className="pbtn" style={{width:"100%"}} disabled={!form.name.trim()||!form.email.trim()||!form.age} onClick={()=>setStep(2)}>NEXT →</button>
+                <div style={{textAlign:"center",marginTop:12,fontSize:12,color:DIM}}>
+                  Already signed up on another device?{" "}
+                  <span style={{color:G,cursor:"pointer",fontWeight:600}} onClick={()=>{
+                    const email=prompt("Enter your email to restore your profile:");
+                    if(!email)return;
+                    const found=players.find(p=>p.email?.toLowerCase()===email.toLowerCase());
+                    if(found){setCu(found);sw("cc_cu",found);setView("profile");toast_("Welcome back, "+found.name+"! 👋");}
+                    else toast_("No profile found for that email.");
+                  }}>Sign in here</span>
+                </div>
               </div>
             )}
             {step===2&&(
