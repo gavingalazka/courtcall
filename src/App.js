@@ -417,7 +417,7 @@ export default function App() {
 
   function postListing(){
     if(!nl.title.trim()||!nl.price)return;
-    const item={id:`l_${Date.now()}`,seller:cu?.name||"",title:nl.title,price:parseFloat(nl.price),phone:nl.phone||cu?.phone||"",category:nl.category,img:nl.img||"https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=400&q=80",status:"pending"};
+    const item={id:`l_${Date.now()}`,seller:cu?.name||"",title:nl.title,price:parseFloat(nl.price),phone:nl.phone||cu?.phone||"",category:nl.category,img:nl.img||null,status:"pending"};
     setList(p=>[item,...p]);setPendingListing(item);setSellOpen(false);setShowPaywall(true);
   }
   function confirmPayment(){
@@ -1457,7 +1457,39 @@ export default function App() {
                 <div className="lbl">Price ($)</div><input className="inp" type="number" placeholder="0.00" value={nl.price} onChange={e=>setNl(d=>({...d,price:e.target.value}))} style={{marginBottom:8}}/>
                 {nl.price&&<div style={{fontSize:12,color:DIM,marginBottom:8}}>You keep the full ${parseFloat(nl.price||0).toFixed(2)} — CourtCall only charges the $1 listing fee.</div>}
                 <div className="lbl">Phone</div><input className="inp" placeholder={cu?.phone||"239-555-0000"} value={nl.phone} onChange={e=>setNl(d=>({...d,phone:e.target.value}))} style={{marginBottom:8}}/>
-                <div className="lbl">Image URL (optional)</div><input className="inp" placeholder="https://..." value={nl.img} onChange={e=>setNl(d=>({...d,img:e.target.value}))} style={{marginBottom:12}}/>
+                <div className="lbl">Item Photo (optional)</div>
+                <label style={{display:"block",marginBottom:12}}>
+                  <div style={{background:"#080C14",border:`1.5px dashed ${nl.img?"rgba(200,240,0,.5)":"#1E3050"}`,borderRadius:10,padding:"14px",textAlign:"center",cursor:"pointer",transition:"border-color .2s"}}>
+                    {nl.img?(
+                      <div>
+                        <img src={nl.img} alt="preview" style={{width:"100%",maxHeight:140,objectFit:"cover",borderRadius:8,marginBottom:8}}/>
+                        <div style={{fontSize:12,color:"#C8F000",fontWeight:600}}>✓ Photo selected — tap to change</div>
+                      </div>
+                    ):(
+                      <div>
+                        <div style={{fontSize:28,marginBottom:6}}>📷</div>
+                        <div style={{fontSize:13,fontWeight:600,color:"#ccc",marginBottom:3}}>Tap to add a photo</div>
+                        <div style={{fontSize:11,color:"#4A6890"}}>Choose from Camera Roll or take a photo</div>
+                      </div>
+                    )}
+                  </div>
+                  <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+                    const f=e.target.files[0];if(!f)return;
+                    const img=new Image();const reader=new FileReader();
+                    reader.onload=ev=>{
+                      img.onload=()=>{
+                        const canvas=document.createElement("canvas");
+                        const MAX=600;let w=img.width,h=img.height;
+                        if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+                        canvas.width=w;canvas.height=h;
+                        canvas.getContext("2d").drawImage(img,0,0,w,h);
+                        setNl(d=>({...d,img:canvas.toDataURL("image/jpeg",0.82)}));
+                      };
+                      img.src=ev.target.result;
+                    };
+                    reader.readAsDataURL(f);
+                  }}/>
+                </label>
                 <button className="pbtn" style={{width:"100%"}} disabled={!nl.title.trim()||!nl.price} onClick={postListing}>POST LISTING</button>
               </div>
             )}
@@ -1465,7 +1497,7 @@ export default function App() {
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               {listings.filter(l=>(mCat==="All"||l.category===mCat)&&l.status!=="pending").map(l=>(
                 <div key={l.id} className="mcard">
-                  <div style={{height:120,overflow:"hidden",background:"#080C14"}}><img src={l.img} alt={l.title} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/></div>
+                  <div style={{height:120,overflow:"hidden",background:"#080C14",display:"flex",alignItems:"center",justifyContent:"center"}}>{l.img?<img src={l.img} alt={l.title} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div style={{fontSize:36,opacity:.3}}>📷</div>}</div>
                   <div style={{padding:"10px"}}>
                     <div style={{fontWeight:600,fontSize:13,marginBottom:2,lineHeight:1.3}}>{l.title}</div>
                     <div style={{fontSize:19,fontWeight:800,color:G,marginBottom:2}}>${l.price}</div>
@@ -1609,7 +1641,7 @@ export default function App() {
                           </div>
                       }
                     </div>
-                    <input type="file" accept="image/*" capture="user" onChange={handleAv} style={{display:"none"}}/>
+                    <input type="file" accept="image/*" onChange={handleAv} style={{display:"none"}}/>
                     <div style={{fontSize:13,color:avPrev?G:DIM,fontWeight:600}}>{avPrev?"Photo selected ✓ — tap to change":"Upload from Photos or Camera"}</div>
                   </label>
                 </div>
