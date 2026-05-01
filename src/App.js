@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
 
 const _SB_URL = "https://znpvckfdivdycvdndxbk.supabase.co";
 const _SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucHZja2ZkaXZkeWN2ZG5keGJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTY2MjcsImV4cCI6MjA5MzE5MjYyN30.xw96vdrpZVxwWdFqeDVkRsvvSTekF9P31KO8RthXQOw";
-const sb = createClient(_SB_URL, _SB_KEY);
+const sb = window.supabase ? window.supabase.createClient(_SB_URL, _SB_KEY) : null;
 
 const G = "#C8F000";
 const BG = "#080C14";
@@ -129,7 +128,9 @@ function NetworkBall({ size = 42 }) {
 }
 
 function Badge({skill,dupr}){
-  const bg=SKILL_COLOR[skill]||"#888";
+  const rating=dupr||skill||"3.5";
+  const bg=SKILL_COLOR[rating]||SKILL_COLOR[skill]||"#888";
+  const dark=["2.5","3.0","3.5"].includes(rating);
   return <span style={{background:bg,color:dark?"#111":"#fff",borderRadius:5,padding:"2px 7px",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>{rating} DUPR</span>;
 }
 function Avatar({name,color,size=38}){
