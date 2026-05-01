@@ -190,6 +190,8 @@ export default function App() {
   const [privateGames, setPrivateGames] = useState(()=>ss("cc_pg",[]));
   const [privateInvites, setPrivateInvites] = useState([]);
   const [showInvitePicker, setShowInvitePicker] = useState(false);
+  const [editProfile, setEditProfile] = useState(false);
+  const [editForm, setEditForm] = useState({});
   const [notifyPrompt, setNotifyPrompt] = useState(null); // {court, day, block, entry}
   const [avPrev, setAvPrev]           = useState(null);
   const [contactForm, setContactForm] = useState({name:"",email:"",subject:"",message:""});
@@ -247,6 +249,16 @@ export default function App() {
       );
     }
   },[]);
+
+  // Auto-start geofencing when user logs in
+  useEffect(()=>{
+    if(cu&&geoSt==="idle"){
+      startGeo();
+    }
+    if(!cu&&geoSt==="watching"){
+      stopGeo();
+    }
+  },[cu]);
 
   // Check for upcoming private games and remind players 30min before
   useEffect(()=>{
@@ -502,7 +514,6 @@ export default function App() {
     {id:"live",    label:"Live",    badge:cins.length},
     {id:"play",    label:"Play",    badge:mySchedCount+privateGames.length},
     {id:"community",label:"Community"},
-    {id:"nearme",  label:geoSt==="watching"?"📍 On":"Near Me"},
     {id:"market",  label:"Shop"},
     {id:cu?"profile":"signup", label:cu?"Profile":"Sign Up"},
     {id:"contact", label:"Contact Us"},
@@ -1268,52 +1279,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ════ NEAR ME ════ */}
-        {view==="nearme"&&(
-          <div>
-            <div style={{fontWeight:800,fontSize:20,marginBottom:4}}>NEAR ME</div>
-            <div style={{color:DIM,fontSize:13,marginBottom:12}}>Get notified automatically when you arrive at a court.</div>
-            <div className="card" style={{marginBottom:12}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div>
-                  <div style={{fontWeight:700,fontSize:16,marginBottom:3}}>
-                    {geoSt==="watching"?<><span className="dot"/>TRACKING YOUR LOCATION</>:"COURT ARRIVAL ALERTS"}
-                  </div>
-                  <div style={{fontSize:13,color:DIM}}>
-                    {geoSt==="idle"&&`Alert when within ${GEO_R}m of a court`}
-                    {geoSt==="watching"&&`Watching GPS · ${userCity}`}
-                    {geoSt==="denied"&&"⚠️ Location permission denied"}
-                    {geoSt==="unsupported"&&"GPS not supported on this device"}
-                    {geoSt==="error"&&"GPS error — try again"}
-                  </div>
-                </div>
-                {geoSt==="watching"
-                  ?<button className="gbtn" onClick={stopGeo}>Stop</button>
-                  :<button className="pbtn" style={{padding:"9px 20px",fontSize:14}} onClick={startGeo} disabled={geoSt==="unsupported"}>Start</button>
-                }
-              </div>
-            </div>
-            {geoSt==="denied"&&(
-              <div style={{fontSize:13,color:"#ff9a6b",background:"rgba(255,90,50,.08)",border:"1px solid rgba(255,90,50,.2)",borderRadius:12,padding:13,marginBottom:12}}>
-                Allow location access in your browser settings, then tap Start.
-              </div>
-            )}
-            {COURTS.map(court=>(
-              <div key={court.id} className={`card${nearC?.id===court.id?" hot":""}`} style={{marginBottom:9,borderColor:nearC?.id===court.id?G:BRD}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div>
-                    <div style={{fontWeight:700,fontSize:14}}>{court.name}</div>
-                    <div style={{fontSize:12,color:DIM,marginTop:2}}>
-                      {upos?`${dLbl(court)} away · `:"— "}{cins.filter(c=>c.cid===court.id).length} players now
-                    </div>
-                  </div>
-                  <div style={{fontSize:20}}>{nearC?.id===court.id?"🟢":geoSt==="watching"?"⚪":"📍"}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* ════ SHOP ════ */}
         {view==="market"&&(
           <div>
@@ -1787,11 +1752,102 @@ export default function App() {
         {/* ════ PROFILE ════ */}
         {view==="profile"&&cu&&(
           <div>
+            {/* Edit Profile Modal */}
+            {editProfile&&(
+              <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+                <div style={{background:CARD,border:`1px solid ${BRD}`,borderRadius:"20px 20px 0 0",padding:"24px 20px 40px",width:"100%",maxWidth:460,maxHeight:"85vh",overflowY:"auto"}}>
+                  <div style={{fontWeight:800,fontSize:20,marginBottom:16}}>Edit Profile</div>
+
+                  {/* Photo */}
+                  <div style={{textAlign:"center",marginBottom:16}}>
+                    <label style={{cursor:"pointer",display:"inline-block"}}>
+                      <div style={{position:"relative",display:"inline-block"}}>
+                        {editForm.avatar
+                          ?<img src={editForm.avatar} style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",border:`3px solid ${G}`}} alt=""/>
+                          :<div style={{width:80,height:80,borderRadius:"50%",background:cu.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,fontWeight:700,color:"#111",border:`3px solid ${G}`}}>{cu.name[0]}</div>
+                        }
+                        <div style={{position:"absolute",bottom:0,right:0,background:G,borderRadius:"50%",width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>📷</div>
+                      </div>
+                      <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+                        const f=e.target.files[0];if(!f)return;
+                        const img=new Image();const reader=new FileReader();
+                        reader.onload=ev=>{img.onload=()=>{
+                          const canvas=document.createElement("canvas");
+                          const MAX=400;let w=img.width,h=img.height;
+                          if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+                          canvas.width=w;canvas.height=h;
+                          canvas.getContext("2d").drawImage(img,0,0,w,h);
+                          setEditForm(d=>({...d,avatar:canvas.toDataURL("image/jpeg",0.82)}));
+                        };img.src=ev.target.result;};
+                        reader.readAsDataURL(f);
+                      }}/>
+                    </label>
+                    <div style={{fontSize:11,color:DIM,marginTop:6}}>Tap to change photo</div>
+                  </div>
+
+                  <div className="lbl">Name</div>
+                  <input className="inp" value={editForm.name||""} onChange={e=>setEditForm(d=>({...d,name:e.target.value}))} style={{marginBottom:10}}/>
+
+                  <div className="lbl">DUPR Rating</div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:6,marginBottom:10}}>
+                    {SKILLS.map(s=>(
+                      <button key={s} onClick={()=>setEditForm(d=>({...d,dupr:s,skill:s}))}
+                        style={{padding:"10px 0",border:`2px solid ${(editForm.dupr||editForm.skill)===s?SKILL_COLOR[s]:"#1E3050"}`,borderRadius:10,background:(editForm.dupr||editForm.skill)===s?SKILL_COLOR[s]+"22":"transparent",color:(editForm.dupr||editForm.skill)===s?SKILL_COLOR[s]:DIM,fontWeight:800,fontSize:13,cursor:"pointer"}}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{display:"flex",gap:8,marginBottom:10}}>
+                    <div style={{flex:1}}>
+                      <div className="lbl">Age</div>
+                      <input className="inp" type="number" placeholder="e.g. 42" value={editForm.age||""} onChange={e=>setEditForm(d=>({...d,age:e.target.value}))}/>
+                    </div>
+                    <div style={{flex:1}}>
+                      <div className="lbl">Gender</div>
+                      <select className="inp" value={editForm.gender||""} onChange={e=>setEditForm(d=>({...d,gender:e.target.value}))}>
+                        <option value="">Prefer not to say</option>
+                        <option>Male</option><option>Female</option><option>Other</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="lbl">Phone</div>
+                  <input className="inp" placeholder="239-555-0100" value={editForm.phone||""} onChange={e=>setEditForm(d=>({...d,phone:e.target.value}))} style={{marginBottom:10}}/>
+
+                  <div className="lbl">Email</div>
+                  <input className="inp" type="email" placeholder="your@email.com" value={editForm.email||""} onChange={e=>setEditForm(d=>({...d,email:e.target.value}))} style={{marginBottom:16}}/>
+
+                  <button className="pbtn" style={{width:"100%",fontSize:16,marginBottom:10}} onClick={()=>{
+                    const updated={...cu,...editForm};
+                    setCu(updated);
+                    sw("cc_cu",updated);
+                    setPl(p=>p.map(x=>x.id===cu.id?updated:x));
+                    setEditProfile(false);
+                    toast_("Profile updated! ✓");
+                  }}>Save Changes</button>
+                  <button className="gbtn" style={{width:"100%"}} onClick={()=>setEditProfile(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
+
             <div className="card" style={{textAlign:"center",marginBottom:10}}>
-              <div style={{display:"flex",justifyContent:"center",marginBottom:10}}><Avatar name={cu.name} color={cu.color} size={68} avatar={cu.avatar||null}/></div>
+              {/* Photo with edit button */}
+              <div style={{position:"relative",display:"inline-block",marginBottom:10}}>
+                <Avatar name={cu.name} color={cu.color} size={88} avatar={cu.avatar||null}/>
+                <div style={{position:"absolute",bottom:2,right:2,background:G,borderRadius:"50%",width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,border:"2px solid #0D1525",cursor:"pointer"}}
+                  onClick={()=>{setEditForm({name:cu.name,dupr:cu.dupr,skill:cu.skill,age:cu.age,gender:cu.gender,phone:cu.phone,email:cu.email,avatar:cu.avatar});setEditProfile(true);}}>
+                  📷
+                </div>
+              </div>
               <div style={{fontSize:22,fontWeight:800}}>{cu.name}</div>
-              <div style={{marginTop:7}}><Badge skill={cu.skill} dupr={cu.dupr}/></div>
-              {cu.phone&&<div style={{color:DIM,fontSize:13,marginTop:6}}>📱 {cu.phone}</div>}
+              <div style={{marginTop:6}}><Badge skill={cu.skill} dupr={cu.dupr}/></div>
+              {cu.age&&<div style={{color:DIM,fontSize:12,marginTop:4}}>🎂 {cu.age} yrs {cu.gender?`· ${cu.gender}`:""}</div>}
+              {cu.email&&<div style={{color:DIM,fontSize:12,marginTop:2}}>✉️ {cu.email}</div>}
+              <button style={{marginTop:12,background:"transparent",border:`1px solid rgba(200,240,0,.3)`,color:G,borderRadius:50,padding:"7px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}
+                onClick={()=>{setEditForm({name:cu.name,dupr:cu.dupr,skill:cu.skill,age:cu.age,gender:cu.gender,phone:cu.phone,email:cu.email,avatar:cu.avatar});setEditProfile(true);}}>
+                ✏️ Edit Profile
+              </button>
             </div>
             {myCin()&&(()=>{const c=myCin();const ct=COURTS.find(co=>co.id===c.cid);return(<div className="card" style={{marginBottom:10,borderColor:"rgba(200,240,0,.2)"}}><div style={{color:G,fontSize:12,marginBottom:4}}><span className="dot"/>Currently checked in</div><div style={{fontSize:14}}>{ct?.name} · {tLeft(c.exp)} left</div><button className="dbtn" style={{marginTop:8}} onClick={()=>checkout(c.id)}>Check Out</button></div>);})()}
             <div className="card" style={{marginBottom:10}}>
