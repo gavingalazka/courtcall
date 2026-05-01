@@ -471,25 +471,72 @@ ${contactForm.message}`,
   function checkout(id){setCins(p=>p.filter(c=>c.id!==id));}
   function follow(pid){setFol(p=>p.includes(pid)?p.filter(x=>x!==pid):[...p,pid]);}
 
-  function signup(){
+  async function signup(){
     const color=AV_BG[players.length%AV_BG.length];
-    const p={id:`p_${Date.now()}`,name:form.name.trim(),dupr:form.dupr,skill:form.skill,phone:form.phone,email:form.email,gender:form.gender,age:form.age,avatar:form.avatar||null,notifyEmail:form.notifyEmail,notifyText:form.notifyText,notifySkills:form.notifySkills,color,pin:form.pin,rememberMe:form.rememberMe};
-    setAvPrev(null);
-    setPlayers(prev=>[...prev,p]);
-    setCu(p);
-    sw("cc_cu",p);
-    if(form.rememberMe){
-      sw("cc_remember","true");
-      sw("cc_uid",p.id);
-    } else {
-      // Set 7-day expiry
-      sw("cc_remember","false");
-      sw("cc_uid",p.id);
-      sw("cc_login_exp", Date.now()+(7*24*60*60*1000));
+    toast_("Creating your profile...");
+
+    try{
+      // Save to Supabase first
+      const{data,error}=await sb?.from("players").insert({
+        name:form.name.trim(),
+        email:form.email.trim(),
+        phone:form.phone||"",
+        dupr:form.dupr||"3.5",
+        skill:form.dupr||form.skill||"3.5",
+        gender:form.gender||"",
+        age:form.age||"",
+        avatar:form.avatar||null,
+        color,
+        pin:form.pin,
+        notify_email:form.notifyEmail,
+        notify_text:form.notifyText,
+        notify_skills:form.notifySkills,
+      }).select().single();
+
+      if(error){
+        if(error.code==="23505"){
+          toast_("That email is already registered — use Sign In");
+        } else {
+          toast_("Error creating profile — try again");
+          console.log("Signup error:",error);
+        }
+        return;
+      }
+
+      // Build player object from Supabase response
+      const p={
+        id:data.id,name:data.name,email:data.email,
+        phone:data.phone||"",dupr:data.dupr||"3.5",
+        skill:data.skill||"3.5",gender:data.gender||"",
+        age:data.age||"",avatar:data.avatar||null,color:data.color,
+        pin:form.pin,rememberMe:form.rememberMe,
+        notifyEmail:data.notify_email,
+        notifyText:data.notify_text,
+        notifySkills:data.notify_skills||[],
+      };
+
+      setAvPrev(null);
+      setPlayers(prev=>[...prev,p]);
+      setCu(p);
+      sw("cc_cu",p);
+
+      if(form.rememberMe){
+        sw("cc_remember","true");
+      } else {
+        sw("cc_remember","false");
+        sw("cc_login_exp",Date.now()+(7*24*60*60*1000));
+      }
+
+      setForm({name:"",dupr:"",skill:"3.5",avatar:null,phone:"",pin:"",rememberMe:true});
+      setStep(1);
+      setView("courts");
+      toast_(`Welcome to CourtCall, ${p.name}! 🏓`);
+      sendWelcomeEmail(p.name, p.email);
+
+    } catch(e){
+      console.log("Signup catch error:",e);
+      toast_("Something went wrong — check your connection");
     }
-    setForm({name:"",dupr:"",skill:"3.5",avatar:null,phone:"",pin:"",rememberMe:true});
-    setStep(1);setView("courts");
-    toast_(`Welcome, ${p.name}! 🏓`);
   }
 
   const STRIPE_LINK = "https://buy.stripe.com/your_payment_link_here";
