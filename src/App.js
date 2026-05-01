@@ -1,6 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 
+function beep(f=660,d=.4){
+  try{const c=new(window.AudioContext||window.webkitAudioContext)();
+  const o=c.createOscillator(),g=c.createGain();
+  o.connect(g);g.connect(c.destination);o.frequency.value=f;
+  g.gain.setValueAtTime(.2,c.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,c.currentTime+d);
+  o.start();o.stop(c.currentTime+d);}catch{}
+}
+
+function ss(k,d=null){try{const v=sessionStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
+function sw(k,v){try{sessionStorage.setItem(k,JSON.stringify(v));}catch{}}
+
 const SUPABASE_URL = "https://znpvckfdivdycvdndxbk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucHZja2ZkaXZkeWN2ZG5keGJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTY2MjcsImV4cCI6MjA5MzE5MjYyN30.xw96vdrpZVxwWdFqeDVkRsvvSTekF9P31KO8RthXQOw";
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -488,6 +500,109 @@ export default function App() {
 
   function toggleFol(pid){
     setFol(p=>p.includes(pid)?p.filter(x=>x!==pid):[...p,pid]);
+  }
+
+
+  const showToast = (msg,sub="",action=null) => {
+    setToast({msg,sub,action});
+    setTimeout(()=>setToast(null),3500);
+  };
+
+  const sendPush = (title,body) => {
+    if(typeof Notification!=="undefined"&&Notification.permission==="granted"){
+      try{new Notification(title,{body});}catch{}
+    }
+  };
+
+  async function doOut(id){
+    try{ await sb.from("checkins").delete().eq("id",id); }catch{}
+    setCins(p=>p.filter(c=>c.id!==id));
+  }
+
+  async function loadPlayers(){
+    try{
+      const{data}=await sb.from("players").select("*").order("created_at",{ascending:false});
+      if(data&&data.length>0){
+        const mapped=data.map(p=>({
+          id:p.id,name:p.name||"",email:p.email||"",phone:p.phone||"",
+          dupr:p.dupr||"3.5",skill:p.skill||"3.5",
+          gender:p.gender||"",age:p.age||"",
+          avatar:p.avatar||null,color:p.color||AV_BG[0],
+          notifyEmail:p.notify_email,notifyText:p.notify_text,
+          notifySkills:p.notify_skills||["3.0","3.5","4.0"],
+        }));
+        setPl(mapped);
+      }
+    }catch(e){console.log("loadPlayers error",e);}
+  }
+
+  async function loadCheckins(){
+    try{
+      const{data}=await sb.from("checkins").select("*").gt("expires_at",new Date().toISOString());
+      if(data){
+        const mapped=data.map(c=>({
+          id:c.id,pid:c.player_id,cid:c.court_id,
+          at:new Date(c.checked_in_at).getTime(),
+          exp:new Date(c.expires_at).getTime(),
+        }));
+        setCins(mapped);
+      }
+    }catch(e){console.log("loadCheckins error",e);}
+  }
+
+  async function loadSchedule(){
+    try{
+      const{data}=await sb.from("schedule").select("*");
+      if(data){
+        setSched(data.map(s=>({
+          id:s.id,pid:s.player_id,name:s.player_name||"",
+          color:s.player_color||AV_BG[0],skill:s.player_skill||"3.5",
+          dupr:s.player_dupr||"3.5",courtId:s.court_id,day:s.day,block:s.block,
+        })));
+      }
+    }catch(e){console.log("loadSchedule error",e);}
+  }
+
+  async function loadListings(){
+    try{
+      const{data}=await sb.from("listings").select("*").eq("status","active").order("created_at",{ascending:false});
+      if(data){
+        setList(data.map(l=>({
+          id:l.id,sellerId:l.seller_id,seller:l.seller_name||"",
+          title:l.title,price:l.price,desc:l.description||"",
+          phone:"",category:l.category,img:l.image_url,status:"active",
+        })));
+      }
+    }catch(e){console.log("loadListings error",e);}
+  }
+
+  async function loadOpenCalls(){
+    try{
+      const{data}=await sb.from("open_calls").select("*").order("created_at",{ascending:false});
+      if(data){
+        setOpenCalls(data.map(c=>({
+          id:c.id,pid:c.player_id,name:c.player_name||"",
+          color:c.player_color||AV_BG[0],skill:c.player_skill||"3.5",
+          dupr:c.player_dupr||"3.5",courtId:c.court_id,
+          courtName:c.court_name||"",address:c.address||"",
+          isPrivate:c.is_private,inviteOnly:c.invite_only,
+          day:c.day,time:c.time_block,msg:c.message,
+          ts:new Date(c.created_at).getTime(),
+        })));
+      }
+    }catch(e){console.log("loadOpenCalls error",e);}
+  }
+
+  async function loadMessages(){
+    try{
+      const{data}=await sb.from("messages").select("*").order("created_at",{ascending:true});
+      if(data){
+        setMessages(data.map(m=>({
+          id:m.id,from:m.from_id,to:m.to_id,
+          text:m.text,ts:new Date(m.created_at).getTime(),
+        })));
+      }
+    }catch(e){console.log("loadMessages error",e);}
   }
 
   function filteredPlayers(){
