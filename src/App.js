@@ -1,4 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const SUPABASE_URL = "https://znpvckfdivdycvdndxbk.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpucHZja2ZkaXZkeWN2ZG5keGJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTY2MjcsImV4cCI6MjA5MzE5MjYyN30.xw96vdrpZVxwWdFqeDVkRsvvSTekF9P31KO8RthXQOw";
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const G = "#C8F000";
 const BG = "#080C14";
