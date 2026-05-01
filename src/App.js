@@ -351,7 +351,7 @@ export default function App() {
   async function loadPlayers(){
     try{
       const{data}=await sb?.from("players").select("*").order("created_at",{ascending:false});
-      if(data) setPl(data.map(p=>({
+      if(data) setPlayers(data.map(p=>({
         id:p.id,name:p.name||"",email:p.email||"",phone:p.phone||"",
         dupr:p.dupr||"3.5",skill:p.skill||"3.5",gender:p.gender||"",
         age:p.age||"",avatar:p.avatar||null,color:p.color||AV_BG[0],
@@ -2098,7 +2098,7 @@ ${contactForm.message}`,
                     const updated={...cu,...editForm};
                     setCu(updated);
                     sw("cc_cu",updated);
-                    setPl(p=>p.map(x=>x.id===cu.id?updated:x));
+                    setPlayers(p=>p.map(x=>x.id===cu.id?updated:x));
                     // Update in Supabase
                     try{
                       await sb?.from("players").update({
@@ -2189,13 +2189,13 @@ ${contactForm.message}`,
               <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🔔 Notification Settings</div>
               <div style={{display:"flex",gap:8,marginBottom:10}}>
                 <div style={{flex:1,background:cu.notifyEmail?"rgba(200,240,0,.08)":"#080C14",border:`1.5px solid ${cu.notifyEmail?G:"#1E3050"}`,borderRadius:10,padding:"10px",cursor:"pointer"}}
-                  onClick={()=>{const updated={...cu,notifyEmail:!cu.notifyEmail};setCu(updated);setPl(p=>p.map(x=>x.id===cu.id?updated:x));}}>
+                  onClick={()=>{const updated={...cu,notifyEmail:!cu.notifyEmail};setCu(updated);setPlayers(p=>p.map(x=>x.id===cu.id?updated:x));}}>
                   <div style={{fontSize:18,marginBottom:2}}>📧</div>
                   <div style={{fontSize:12,fontWeight:700,color:cu.notifyEmail?G:"#888"}}>Email</div>
                   <div style={{fontSize:10,color:DIM}}>{cu.email||"not set"}</div>
                 </div>
                 <div style={{flex:1,background:cu.notifyText?"rgba(200,240,0,.08)":"#080C14",border:`1.5px solid ${cu.notifyText?G:"#1E3050"}`,borderRadius:10,padding:"10px",cursor:"pointer"}}
-                  onClick={()=>{const updated={...cu,notifyText:!cu.notifyText};setCu(updated);setPl(p=>p.map(x=>x.id===cu.id?updated:x));}}>
+                  onClick={()=>{const updated={...cu,notifyText:!cu.notifyText};setCu(updated);setPlayers(p=>p.map(x=>x.id===cu.id?updated:x));}}>
                   <div style={{fontSize:18,marginBottom:2}}>💬</div>
                   <div style={{fontSize:12,fontWeight:700,color:cu.notifyText?G:"#888"}}>SMS</div>
                   <div style={{fontSize:10,color:DIM}}>{cu.phone||"not set"}</div>
@@ -2209,7 +2209,7 @@ ${contactForm.message}`,
                     <button key={s} className={`chip ${on?"on":""}`}
                       onClick={()=>{
                         const updated={...cu,notifySkills:on?(cu.notifySkills||[]).filter(x=>x!==s):[...(cu.notifySkills||[]),s]};
-                        setCu(updated);setPl(p=>p.map(x=>x.id===cu.id?updated:x));
+                        setCu(updated);setPlayers(p=>p.map(x=>x.id===cu.id?updated:x));
                       }}>{s} DUPR</button>
                   );
                 })}
